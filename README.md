@@ -7,7 +7,7 @@ A responsive, dependency-free personal scholar website designed for GitHub Pages
 1. Replace Zhang Zi-Ang's email, affiliations, and profile links in `index.html`.
 2. Replace the sample research, publications, experience, and blog content.
 3. Add your CV as `assets/cv.pdf`, then update the CV download link in `index.html`.
-4. Replace the temporary online video URL in `index.html` with your own looping 2D turbulence animation. You may use an online MP4 URL or `assets/turbulence.mp4`. The procedural flow field remains as a loading and error fallback.
+4. Generate `assets/vorticity.vt2d.gz` from your HDF5 snapshots using the workflow below.
 5. Update the page title and meta description.
 
 ## Publish on GitHub Pages
@@ -39,7 +39,7 @@ Edit those files using standard Markdown. The page loads them automatically; pre
 
 The Home page extracts the title and abstract automatically. Clicking the title opens the complete Markdown article on `blog.html`.
 
-## Generate the ASCII turbulence movie
+## Generate the dynamic ASCII turbulence data
 
 Install the converter dependencies:
 
@@ -50,31 +50,17 @@ python -m pip install -r requirements-ascii.txt
 Inspect the datasets stored in an HDF5 file:
 
 ```powershell
-python scripts/h5_to_ascii_video.py snapshots.h5 --list
+python scripts/h5_to_vorticity_data.py snapshots.h5 --list
 ```
 
-Generate the movie (replace `/vorticity` with the relevant dataset path):
+Compress the vorticity snapshots (adjust the time axis and stride for your file):
 
 ```powershell
-python scripts/h5_to_ascii_video.py snapshots.h5 --dataset /vorticity
+python scripts/h5_to_vorticity_data.py snapshots.h5 --dataset vorticity --time-axis 2
 ```
 
-Add a two-second fade to black at the end:
+The default output is `assets/vorticity.vt2d.gz`. It contains gzip-compressed, signed 8-bit snapshots and playback metadata, not rendered pixels. The browser decompresses it, interpolates adjacent snapshots, and renders the ASCII field at the current screen resolution.
 
-```powershell
-python scripts/h5_to_ascii_video.py snapshots.h5 --dataset /vorticity --fade-out 2
-```
+The renderer uses periodic modulo indexing, allowing the square simulation domain to continue seamlessly across viewport boundaries. `--view-scale` controls the visible fraction of the domain; the default `1.0` shows one complete periodic domain vertically and continues it horizontally on wider viewports. ASCII glyphs occupy equal square cells, density and four brightness levels encode magnitude, and red or green encodes vorticity sign. Fade-in and fade-out scale the field magnitude before glyph selection.
 
-Apply matching two-second field fades at both ends:
-
-```powershell
-python scripts/h5_to_ascii_video.py snapshots.h5 --dataset /vorticity --fade-in 2 --fade-out 2
-```
-
-The fades scale vorticity magnitude before ASCII rendering. Glyphs therefore transition through the same magnitude mapping used by the rest of the movie instead of merely becoming transparent.
-
-The default output is `assets/turbulence-ascii.mp4`. The website automatically prefers this pre-rendered movie and falls back to the online Pexels video if the file is absent. Run `python scripts/h5_to_ascii_video.py --help` for frame range, axes, component, FPS, resolution, character density, normalization, and compression options.
-
-By default, ASCII symbol density and four glyph-brightness levels encode vorticity magnitude, while color encodes sign: red for positive values and green for negative values. Pass `--color-mode cyan` to render a single-color style. Use `--gamma` below `1` to brighten weaker structures, and adjust `--high-percentile` to control clipping of the strongest vortices.
-
-After generating the final movie, commit `assets/turbulence-ascii.mp4` with the website files and push it to GitHub Pages. Keep the source HDF5 file local; `*.h5` and `*.hdf5` are excluded by `.gitignore` because simulation datasets are typically too large for GitHub.
+Run `python scripts/h5_to_vorticity_data.py --help` for frame range, grid resolution, FPS, normalization percentile, gamma, and fade settings. Commit the generated `.vt2d.gz` asset, but keep the source HDF5 local; `*.h5` and `*.hdf5` are excluded by `.gitignore` because simulation datasets are typically too large for GitHub.

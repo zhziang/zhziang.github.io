@@ -7,16 +7,10 @@ nav.open{background:#050a10}
 .hero{position:relative;isolation:isolate;overflow:hidden;background:#050a10}
 .hero:after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(3,8,13,.9) 0%,rgba(3,8,13,.76) 32%,rgba(3,8,13,.34) 58%,rgba(3,8,13,.06) 100%)}
 .hero-simulation{position:absolute;inset:0;z-index:-2;overflow:hidden}
-.hero-simulation video,.hero-simulation #flow-field,.hero-simulation #ascii-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.hero-simulation video{display:none;opacity:.5;filter:contrast(1.3) saturate(.7) hue-rotate(160deg)}
-.hero-simulation.video-ready video{display:block;opacity:0}
-.hero-simulation.video-ready #flow-field{display:none}
-#ascii-video{display:none;pointer-events:none}
-.hero-simulation.video-ready #ascii-video{display:block}
-.hero-simulation.video-ready.pre-rendered-ascii video{opacity:1;filter:saturate(1.18) brightness(1.12)}
-.hero-simulation.video-ready.pre-rendered-ascii #ascii-video{display:none}
-.hero-simulation.video-ready.ascii-failed video{opacity:.5}
-.hero-simulation.video-ready.ascii-failed #ascii-video{display:none}
+.hero-simulation #flow-field,.hero-simulation #vorticity-ascii{position:absolute;inset:0;width:100%;height:100%}
+#vorticity-ascii{display:none;pointer-events:none;filter:saturate(1.18) brightness(1.12);font-variant-ligatures:none}
+.hero-simulation.data-ready #vorticity-ascii{display:block}
+.hero-simulation.data-ready #flow-field{display:none}
 #flow-field{pointer-events:none;mix-blend-mode:screen}
 .hero-copy{position:relative;z-index:1}
 .hero h1{font-family:var(--sans);font-weight:600;text-transform:uppercase;line-height:.88;text-shadow:0 0 30px rgba(53,189,245,.18)}
@@ -75,4 +69,4 @@ footer{background:#020508}
 .research-item li{background:#0a1721}
 @media (max-width:900px){.hero:after{background:linear-gradient(180deg,rgba(3,8,13,.78) 0%,rgba(3,8,13,.5) 62%,rgba(3,8,13,.14) 100%)}.intro-strip{grid-template-columns:repeat(3,1fr)}}
 @media (max-width:620px){.hero h1{font-size:clamp(42px,14vw,58px)}.intro-strip{grid-template-columns:1fr}}
-@media (prefers-reduced-motion:reduce){#flow-field,#ascii-video{display:none}.hero-simulation.video-ready video{opacity:.35}.cursor{animation:none}}
+@media (prefers-reduced-motion:reduce){#flow-field{display:none}.cursor{animation:none}}

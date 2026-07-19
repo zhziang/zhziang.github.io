@@ -124,92 +124,115 @@ if (blogIndex) {
 
 const flowCanvas = document.querySelector('#flow-field');
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const turbulenceVideo = document.querySelector('#turbulence-video');
-const asciiVideo = document.querySelector('#ascii-video');
+const vorticityCanvas = document.querySelector('#vorticity-ascii');
 
-if (turbulenceVideo) {
-  let asciiVideoStarted = false;
-  const startAsciiVideo = () => {
-    if (!asciiVideo || asciiVideoStarted || reduceMotion) return;
-    asciiVideoStarted = true;
-    const simulation = turbulenceVideo.closest('.hero-simulation');
-    const output = asciiVideo.getContext('2d');
-    const sample = document.createElement('canvas');
-    const sampleContext = sample.getContext('2d', { willReadFrequently: true });
-    const ramp = ' .:-=+*#%@';
-    let lastFrame = 0;
+if (vorticityCanvas) {
+  const loadVorticity = async () => {
+    try {
+      if (!('DecompressionStream' in window)) throw new Error('This browser does not support gzip streams');
+      const response = await fetch('assets/vorticity.vt2d.gz?v=domain-v12');
+      if (!response.ok || !response.body) throw new Error(`Vorticity data returned HTTP ${response.status}`);
+      const decompressed = response.body.pipeThrough(new DecompressionStream('gzip'));
+      const buffer = await new Response(decompressed).arrayBuffer();
+      const view = new DataView(buffer);
+      const magic = new TextDecoder().decode(new Uint8Array(buffer, 0, 4));
+      if (magic !== 'VT2D') throw new Error('Invalid vorticity data signature');
+      const headerLength = view.getUint32(4, true);
+      const metadata = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 8, headerLength)));
+      const values = new Int8Array(buffer, 8 + headerLength);
+      const expected = metadata.frames * metadata.height * metadata.width;
+      if (values.length !== expected || !metadata.periodic) throw new Error('Invalid or non-periodic vorticity payload');
+      startVorticityRenderer(metadata, values);
+    } catch (error) {
+      console.warn('Dynamic vorticity rendering is unavailable; using the flow fallback.', error);
+    }
+  };
 
-    const renderAsciiFrame = (time) => {
-      if (time - lastFrame < 83) {
-        requestAnimationFrame(renderAsciiFrame);
+  const startVorticityRenderer = (metadata, values) => {
+    const simulation = vorticityCanvas.closest('.hero-simulation');
+    const output = vorticityCanvas.getContext('2d');
+    const frameSize = metadata.height * metadata.width;
+    const cycleDuration = metadata.frames / metadata.fps;
+    const intensities = [0.34, 0.52, 0.74, 1];
+    const colors = {
+      positive: [238, 76, 88],
+      negative: [67, 218, 111],
+    };
+    let lastFrameTime = -Infinity;
+    let startTime = null;
+    simulation.classList.add('data-ready');
+
+    const draw = (time, staticFrame = false) => {
+      if (!staticFrame && time - lastFrameTime < 50) {
+        requestAnimationFrame(draw);
         return;
       }
-      lastFrame = time;
+      lastFrameTime = time;
       const bounds = simulation.getBoundingClientRect();
       const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
-      const columns = Math.max(60, Math.min(140, Math.round(bounds.width / 9)));
-      const rows = Math.max(32, Math.round(bounds.height / 12));
-      if (asciiVideo.width !== Math.round(bounds.width * ratio) || asciiVideo.height !== Math.round(bounds.height * ratio)) {
-        asciiVideo.width = Math.round(bounds.width * ratio);
-        asciiVideo.height = Math.round(bounds.height * ratio);
+      const width = Math.max(1, bounds.width);
+      const height = Math.max(1, bounds.height);
+      if (vorticityCanvas.width !== Math.round(width * ratio) || vorticityCanvas.height !== Math.round(height * ratio)) {
+        vorticityCanvas.width = Math.round(width * ratio);
+        vorticityCanvas.height = Math.round(height * ratio);
         output.setTransform(ratio, 0, 0, ratio, 0, 0);
       }
-      sample.width = columns;
-      sample.height = rows;
 
-      const videoRatio = turbulenceVideo.videoWidth / turbulenceVideo.videoHeight;
-      const sampleRatio = columns / rows;
-      let sourceWidth = turbulenceVideo.videoWidth;
-      let sourceHeight = turbulenceVideo.videoHeight;
-      let sourceX = 0;
-      let sourceY = 0;
-      if (videoRatio > sampleRatio) {
-        sourceWidth = turbulenceVideo.videoHeight * sampleRatio;
-        sourceX = (turbulenceVideo.videoWidth - sourceWidth) / 2;
-      } else {
-        sourceHeight = turbulenceVideo.videoWidth / sampleRatio;
-        sourceY = (turbulenceVideo.videoHeight - sourceHeight) / 2;
+      const cellSize = Math.max(10, Math.ceil(height / 58));
+      output.font = `${cellSize}px "IBM Plex Mono", monospace`;
+      const glyphScaleX = cellSize / Math.max(1, output.measureText('M').width);
+      const columns = Math.ceil(width / cellSize);
+      const rows = Math.ceil(height / cellSize);
+      if (!staticFrame && startTime === null) startTime = time;
+      const elapsed = staticFrame
+        ? Math.max(metadata.fadeIn, 0)
+        : ((time - startTime) / 1000) % cycleDuration;
+      const framePosition = elapsed * metadata.fps;
+      const frameA = Math.floor(framePosition) % metadata.frames;
+      const frameB = (frameA + 1) % metadata.frames;
+      const blend = framePosition - Math.floor(framePosition);
+      let fieldScale = 1;
+      if (metadata.fadeIn > 0 && elapsed < metadata.fadeIn) fieldScale = elapsed / metadata.fadeIn;
+      if (metadata.fadeOut > 0 && elapsed > cycleDuration - metadata.fadeOut) {
+        fieldScale = Math.min(fieldScale, (cycleDuration - elapsed) / metadata.fadeOut);
       }
 
-      try {
-        sampleContext.drawImage(turbulenceVideo, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, columns, rows);
-        const pixels = sampleContext.getImageData(0, 0, columns, rows).data;
-        const cellWidth = bounds.width / columns;
-        const cellHeight = bounds.height / rows;
-        output.fillStyle = '#03080d';
-        output.fillRect(0, 0, bounds.width, bounds.height);
-        output.font = `${Math.ceil(cellHeight * 1.05)}px "IBM Plex Mono", monospace`;
-        output.textAlign = 'center';
-        output.textBaseline = 'middle';
-        for (let y = 0; y < rows; y += 1) {
-          for (let x = 0; x < columns; x += 1) {
-            const index = (y * columns + x) * 4;
-            const brightness = (pixels[index] * 0.2126 + pixels[index + 1] * 0.7152 + pixels[index + 2] * 0.0722) / 255;
-            const character = ramp[Math.min(ramp.length - 1, Math.floor(brightness * ramp.length))];
-            output.fillStyle = `rgba(53, 189, 245, ${0.18 + brightness * 0.72})`;
-            output.fillText(character, (x + 0.5) * cellWidth, (y + 0.5) * cellHeight);
-          }
+      output.fillStyle = '#03080d';
+      output.fillRect(0, 0, width, height);
+      output.textBaseline = 'middle';
+      output.textAlign = 'center';
+      output.save();
+      output.scale(glyphScaleX, 1);
+      for (let y = 0; y < rows; y += 1) {
+        const periodicY = ((0.5 + ((y + 0.5) / rows - 0.5) * metadata.viewScale) % 1 + 1) % 1;
+        const sourceY = Math.floor(periodicY * metadata.height) % metadata.height;
+        for (let x = 0; x < columns; x += 1) {
+          // Horizontal distance uses the same scale as vertical distance, preserving square cells.
+          const periodicX = ((0.5 + ((x + 0.5) - columns / 2) / rows * metadata.viewScale) % 1 + 1) % 1;
+          const sourceX = Math.floor(periodicX * metadata.width) % metadata.width;
+          const offset = sourceY * metadata.width + sourceX;
+          const valueA = values[frameA * frameSize + offset];
+          const valueB = values[frameB * frameSize + offset];
+          const value = (valueA + (valueB - valueA) * blend) * fieldScale;
+          const magnitude = Math.min(1, Math.abs(value) / 127) ** metadata.gamma;
+          const glyph = metadata.ramp[Math.min(metadata.ramp.length - 1, Math.floor(magnitude * metadata.ramp.length))];
+          if (glyph === ' ') continue;
+          const level = Math.min(3, Math.floor(magnitude * 4));
+          const baseColor = value >= 0 ? colors.positive : colors.negative;
+          const color = baseColor.map((channel) => Math.round(channel * intensities[level]));
+          output.fillStyle = `rgb(${color.join(',')})`;
+          output.fillText(glyph, ((x + 0.5) * cellSize) / glyphScaleX, (y + 0.5) * cellSize);
         }
-      } catch (error) {
-        simulation.classList.add('ascii-failed');
-        console.warn('ASCII video rendering is unavailable; showing the source video.', error);
-        return;
       }
-      requestAnimationFrame(renderAsciiFrame);
+      output.restore();
+      if (!staticFrame) requestAnimationFrame(draw);
     };
-    requestAnimationFrame(renderAsciiFrame);
+
+    if (reduceMotion) draw(0, true);
+    else requestAnimationFrame(draw);
   };
 
-  const activateTurbulenceVideo = () => {
-    const simulation = turbulenceVideo.closest('.hero-simulation');
-    const isPreRenderedAscii = turbulenceVideo.currentSrc.includes('turbulence-ascii.mp4');
-    simulation.classList.add('video-ready');
-    simulation.classList.toggle('pre-rendered-ascii', isPreRenderedAscii);
-    turbulenceVideo.play().catch(() => {});
-    if (!isPreRenderedAscii) startAsciiVideo();
-  };
-  turbulenceVideo.addEventListener('canplay', activateTurbulenceVideo);
-  if (turbulenceVideo.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) activateTurbulenceVideo();
+  loadVorticity();
 }
 
 if (flowCanvas && !reduceMotion) {
@@ -236,6 +259,7 @@ if (flowCanvas && !reduceMotion) {
   };
 
   const animateFlow = (time) => {
+    if (flowCanvas.closest('.hero-simulation').classList.contains('data-ready')) return;
     context.fillStyle = 'rgba(16, 46, 53, 0.045)';
     context.fillRect(0, 0, width, height);
     context.lineWidth = 0.8;
