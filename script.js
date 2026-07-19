@@ -122,7 +122,6 @@ if (blogIndex) {
   loadBlogIndex();
 }
 
-const flowCanvas = document.querySelector('#flow-field');
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const vorticityCanvas = document.querySelector('#vorticity-ascii');
 
@@ -144,7 +143,7 @@ if (vorticityCanvas) {
       if (values.length !== expected || !metadata.periodic) throw new Error('Invalid or non-periodic vorticity payload');
       startVorticityRenderer(metadata, values);
     } catch (error) {
-      console.warn('Dynamic vorticity rendering is unavailable; using the flow fallback.', error);
+      console.warn('Dynamic vorticity rendering is unavailable; leaving the background blank.', error);
     }
   };
 
@@ -233,59 +232,4 @@ if (vorticityCanvas) {
   };
 
   loadVorticity();
-}
-
-if (flowCanvas && !reduceMotion) {
-  const context = flowCanvas.getContext('2d');
-  const particles = Array.from({ length: 74 }, () => ({ x: Math.random(), y: Math.random(), age: Math.random() * 180 }));
-  let width = 0;
-  let height = 0;
-  let animationFrame;
-
-  const resizeFlow = () => {
-    const bounds = flowCanvas.getBoundingClientRect();
-    const ratio = Math.min(window.devicePixelRatio || 1, 2);
-    width = bounds.width;
-    height = bounds.height;
-    flowCanvas.width = Math.round(width * ratio);
-    flowCanvas.height = Math.round(height * ratio);
-    context.setTransform(ratio, 0, 0, ratio, 0, 0);
-  };
-
-  const resetParticle = (particle, randomX = false) => {
-    particle.x = randomX ? Math.random() : -0.02;
-    particle.y = Math.random();
-    particle.age = 0;
-  };
-
-  const animateFlow = (time) => {
-    if (flowCanvas.closest('.hero-simulation').classList.contains('data-ready')) return;
-    context.fillStyle = 'rgba(16, 46, 53, 0.045)';
-    context.fillRect(0, 0, width, height);
-    context.lineWidth = 0.8;
-    context.strokeStyle = 'rgba(195, 235, 225, 0.38)';
-    particles.forEach((particle) => {
-      const previousX = particle.x;
-      const previousY = particle.y;
-      const swirl = Math.sin(particle.x * 13 + time * 0.00032) * Math.cos(particle.y * 9 - time * 0.0002);
-      particle.x += 0.0018 + 0.0008 * Math.cos(particle.y * 11);
-      particle.y += swirl * 0.0012;
-      particle.age += 1;
-      context.beginPath();
-      context.moveTo(previousX * width, previousY * height);
-      context.lineTo(particle.x * width, particle.y * height);
-      context.stroke();
-      if (particle.x > 1.02 || particle.y < -0.05 || particle.y > 1.05 || particle.age > 420) resetParticle(particle);
-    });
-    animationFrame = requestAnimationFrame(animateFlow);
-  };
-
-  resizeFlow();
-  particles.forEach((particle) => resetParticle(particle, true));
-  animationFrame = requestAnimationFrame(animateFlow);
-  window.addEventListener('resize', resizeFlow);
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) cancelAnimationFrame(animationFrame);
-    else animationFrame = requestAnimationFrame(animateFlow);
-  });
 }
