@@ -201,9 +201,12 @@ if (turbulenceVideo) {
   };
 
   const activateTurbulenceVideo = () => {
-    turbulenceVideo.closest('.hero-simulation').classList.add('video-ready');
+    const simulation = turbulenceVideo.closest('.hero-simulation');
+    const isPreRenderedAscii = turbulenceVideo.currentSrc.includes('turbulence-ascii.mp4');
+    simulation.classList.add('video-ready');
+    simulation.classList.toggle('pre-rendered-ascii', isPreRenderedAscii);
     turbulenceVideo.play().catch(() => {});
-    startAsciiVideo();
+    if (!isPreRenderedAscii) startAsciiVideo();
   };
   turbulenceVideo.addEventListener('canplay', activateTurbulenceVideo);
   if (turbulenceVideo.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) activateTurbulenceVideo();

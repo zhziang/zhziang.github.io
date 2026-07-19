@@ -38,3 +38,43 @@ Edit those files using standard Markdown. The page loads them automatically; pre
 3. Add the filename to `content/blogs/index.json`.
 
 The Home page extracts the title and abstract automatically. Clicking the title opens the complete Markdown article on `blog.html`.
+
+## Generate the ASCII turbulence movie
+
+Install the converter dependencies:
+
+```powershell
+python -m pip install -r requirements-ascii.txt
+```
+
+Inspect the datasets stored in an HDF5 file:
+
+```powershell
+python scripts/h5_to_ascii_video.py snapshots.h5 --list
+```
+
+Generate the movie (replace `/vorticity` with the relevant dataset path):
+
+```powershell
+python scripts/h5_to_ascii_video.py snapshots.h5 --dataset /vorticity
+```
+
+Add a two-second fade to black at the end:
+
+```powershell
+python scripts/h5_to_ascii_video.py snapshots.h5 --dataset /vorticity --fade-out 2
+```
+
+Apply matching two-second field fades at both ends:
+
+```powershell
+python scripts/h5_to_ascii_video.py snapshots.h5 --dataset /vorticity --fade-in 2 --fade-out 2
+```
+
+The fades scale vorticity magnitude before ASCII rendering. Glyphs therefore transition through the same magnitude mapping used by the rest of the movie instead of merely becoming transparent.
+
+The default output is `assets/turbulence-ascii.mp4`. The website automatically prefers this pre-rendered movie and falls back to the online Pexels video if the file is absent. Run `python scripts/h5_to_ascii_video.py --help` for frame range, axes, component, FPS, resolution, character density, normalization, and compression options.
+
+By default, ASCII symbol density and four glyph-brightness levels encode vorticity magnitude, while color encodes sign: red for positive values and green for negative values. Pass `--color-mode cyan` to render a single-color style. Use `--gamma` below `1` to brighten weaker structures, and adjust `--high-percentile` to control clipping of the strongest vortices.
+
+After generating the final movie, commit `assets/turbulence-ascii.mp4` with the website files and push it to GitHub Pages. Keep the source HDF5 file local; `*.h5` and `*.hdf5` are excluded by `.gitignore` because simulation datasets are typically too large for GitHub.

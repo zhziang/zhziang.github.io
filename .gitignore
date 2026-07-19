@@ -1,0 +1,4 @@
+.venv/
+*.h5
+*.hdf5
+__pycache__/
